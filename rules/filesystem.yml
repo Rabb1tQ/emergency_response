@@ -1,0 +1,69 @@
+- id: hidden_file_detection
+  description: 检测隐藏文件
+  level: high
+  target_section: filesystem
+  pattern: '\/\.[a-zA-Z0-9_-]+\.(sh|py|pl|php|exe)'
+  case_sensitive: true
+
+- id: suspicious_file_location
+  description: 检测可疑文件位置
+  level: high
+  target_section: filesystem
+  pattern: '(\/tmp\/|\/dev\/shm\/|\/var\/tmp\/).*\.(sh|py|pl|php|exe)'
+  case_sensitive: true
+
+- id: world_writable_sensitive_file
+  description: 检测敏感文件的全局可写权限
+  level: critical
+  target_section: filesystem
+  pattern: '(\/etc\/passwd|\/etc\/shadow|\/etc\/sudoers).*\s+777'
+  case_sensitive: true
+
+- id: unauthorized_suid_binary
+  description: 检测未授权的SUID二进制文件
+  level: high
+  target_section: filesystem
+  pattern: '(\/usr\/bin\/|\/usr\/sbin\/).*\s+-perm\s+-4000'
+  case_sensitive: true
+
+- id: suspicious_script_extension
+  description: 检测可疑脚本扩展名
+  level: medium
+  target_section: filesystem
+  pattern: '\.(jsp|jspx|aspx|php[3-7]?|phtml)$'
+  case_sensitive: false
+
+- id: sensitive_config_backup
+  description: 检测敏感配置文件备份
+  level: medium
+  target_section: filesystem
+  pattern: '(\.bak|\.backup|\.old)$'
+  case_sensitive: false
+
+- id: unauthorized_ssh_key
+  description: 检测未授权的SSH密钥
+  level: high
+  target_section: filesystem
+  pattern: '(\/\.ssh\/authorized_keys|\/\.ssh\/id_[rds]sa)'
+  case_sensitive: true
+
+- id: suspicious_file_ownership
+  description: 检测可疑文件所有权
+  level: medium
+  target_section: filesystem
+  pattern: '(root:root|nobody:nobody).*\.(sh|py|pl)'
+  case_sensitive: true
+
+- id: large_log_file
+  description: 检测异常大的日志文件
+  level: medium
+  target_section: filesystem
+  pattern: '.*\.log.*\s+[0-9]+M'
+  case_sensitive: true
+
+- id: suspicious_file_timestamp
+  description: 检测可疑的文件时间戳
+  level: high
+  target_section: filesystem
+  pattern: '(mtime|ctime).*\s+0\s+'
+  case_sensitive: true 

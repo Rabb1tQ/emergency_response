@@ -1,0 +1,69 @@
+- id: log_deletion_attempt
+  description: 检测日志删除尝试
+  level: high
+  target_section: log
+  pattern: '(rm\s+-rf\s+\/var\/log|truncate\s+-s\s+0)'
+  case_sensitive: true
+
+- id: suspicious_login_attempt
+  description: 检测可疑的登录尝试
+  level: high
+  target_section: log
+  pattern: '(Failed password|Invalid user|Authentication failure)'
+  case_sensitive: false
+
+- id: root_login_attempt
+  description: 检测直接root登录
+  level: critical
+  target_section: log
+  pattern: '(Accepted.*for\s+root@|Accepted.*from\s+root)'
+  case_sensitive: false
+
+- id: ssh_brute_force
+  description: 检测SSH暴力破解
+  level: high
+  target_section: log
+  pattern: '(Failed.*[5-9][0-9]+ times|Received disconnect from.*preauth)'
+  case_sensitive: false
+
+- id: sudo_abuse
+  description: 检测sudo权限滥用
+  level: high
+  target_section: log
+  pattern: '(COMMAND=\(.*\).*NOPASSWD)'
+  case_sensitive: true
+
+- id: log_tampering_indicator
+  description: 检测日志篡改迹象
+  level: critical
+  target_section: log
+  pattern: '(logrotate\s+-f|chattr\s+\+i)'
+  case_sensitive: true
+
+- id: unauthorized_service_restart
+  description: 检测未授权服务重启
+  level: high
+  target_section: log
+  pattern: '(systemctl\s+restart|service\s+.*\s+restart)'
+  case_sensitive: true
+
+- id: kernel_module_loading
+  description: 检测内核模块加载
+  level: medium
+  target_section: log
+  pattern: '(insmod|modprobe).*\s+/.*\.(ko|ko.xz)'
+  case_sensitive: true
+
+- id: system_crash_log
+  description: 检测系统崩溃日志
+  level: medium
+  target_section: log
+  pattern: '(kernel panic|segmentation fault|general protection fault)'
+  case_sensitive: false
+
+- id: sensitive_data_exposure
+  description: 检测敏感数据泄露
+  level: critical
+  target_section: log
+  pattern: '(password=|secret=|token=|key=)'
+  case_sensitive: false 

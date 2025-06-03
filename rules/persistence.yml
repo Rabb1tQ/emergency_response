@@ -1,0 +1,69 @@
+- id: unauthorized_cron_job
+  description: 检测未授权的计划任务
+  level: high
+  target_section: persistence
+  pattern: '(wget\s+|curl\s+|python\s+-c|bash\s+-c).*@(daily|hourly|reboot)'
+  case_sensitive: true
+
+- id: suspicious_systemd_service
+  description: 检测可疑的系统服务
+  level: high
+  target_section: persistence
+  pattern: '(\/tmp\/|\/dev\/shm\/).*\.service'
+  case_sensitive: true
+
+- id: hidden_ssh_backdoor
+  description: 检测隐藏的SSH后门
+  level: critical
+  target_section: persistence
+  pattern: '(AuthorizedKeysFile\s+\/dev\/null|PermitRootLogin\s+forced-commands-only)'
+  case_sensitive: true
+
+- id: startup_script_modification
+  description: 检测启动脚本修改
+  level: high
+  target_section: persistence
+  pattern: '(rc\.local|init\.d\/.*|systemd\/system\/.*)\s+\+x'
+  case_sensitive: true
+
+- id: unauthorized_profile_modification
+  description: 检测未授权的配置文件修改
+  level: medium
+  target_section: persistence
+  pattern: '(\.bashrc|\.bash_profile|\.profile).*\s+\+x'
+  case_sensitive: true
+
+- id: suspicious_library_preload
+  description: 检测可疑的库预加载
+  level: critical
+  target_section: persistence
+  pattern: '(LD_PRELOAD=|LD_LIBRARY_PATH=).*\/'
+  case_sensitive: true
+
+- id: kernel_module_persistence
+  description: 检测内核模块持久化
+  level: high
+  target_section: persistence
+  pattern: '(\/etc\/modules|\/etc\/modprobe\.d\/).*\.(ko|ko\.xz)'
+  case_sensitive: true
+
+- id: docker_socket_persistence
+  description: 检测Docker套接字持久化
+  level: high
+  target_section: persistence
+  pattern: '(docker\s+run.*-v\s+\/var\/run\/docker\.sock)'
+  case_sensitive: true
+
+- id: network_configuration_backdoor
+  description: 检测网络配置后门
+  level: high
+  target_section: persistence
+  pattern: '(iptables.*-j\s+ACCEPT|ip6tables.*-j\s+ACCEPT)'
+  case_sensitive: true
+
+- id: user_profile_injection
+  description: 检测用户配置文件注入
+  level: medium
+  target_section: persistence
+  pattern: '(echo\s+.*>>.*\.(bashrc|profile|bash_profile))'
+  case_sensitive: true 

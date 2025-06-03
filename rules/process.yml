@@ -1,0 +1,69 @@
+- id: hidden_process
+  description: 检测隐藏进程
+  level: high
+  target_section: process
+  pattern: '(ps\s+-aux|top).*\[.*\]'
+  case_sensitive: true
+
+- id: suspicious_process_name
+  description: 检测可疑进程名称
+  level: medium
+  target_section: process
+  pattern: '(kworker\.[a-f0-9]+|\.tmp\.[a-f0-9]+|systemd-resolve\.tmp)'
+  case_sensitive: true
+
+- id: crypto_mining_process
+  description: 检测加密挖矿进程
+  level: high
+  target_section: process
+  pattern: '(xmrig|cpuminer|minerd|cryptonight)'
+  case_sensitive: false
+
+- id: reverse_shell_process
+  description: 检测反向Shell进程
+  level: critical
+  target_section: process
+  pattern: '(bash\s+-i|python\s+-c\s*[\'"].*socket\.socket\(.*\))'
+  case_sensitive: true
+
+- id: obfuscated_process_command
+  description: 检测混淆的进程命令
+  level: high
+  target_section: process
+  pattern: '(base64\s+-d|eval\s*\(|exec\s*\()'
+  case_sensitive: true
+
+- id: suspicious_process_parent
+  description: 检测可疑的父进程
+  level: medium
+  target_section: process
+  pattern: '(systemd|init).*\s+(nc|python|perl|bash)'
+  case_sensitive: true
+
+- id: unauthorized_interpreter
+  description: 检测未授权的解释器
+  level: high
+  target_section: process
+  pattern: '(python[23]?|perl|ruby|lua)\s+-c\s*[\'"].*\''
+  case_sensitive: true
+
+- id: process_injection_indicator
+  description: 检测进程注入迹象
+  level: critical
+  target_section: process
+  pattern: '(ptrace|inject|dlopen|dlsym)'
+  case_sensitive: true
+
+- id: memory_resident_process
+  description: 检测内存驻留进程
+  level: medium
+  target_section: process
+  pattern: '(memfd_create|memfd:)'
+  case_sensitive: true
+
+- id: suspicious_process_arguments
+  description: 检测可疑进程参数
+  level: high
+  target_section: process
+  pattern: '(-q\s*-o\s*StrictHostKeyChecking=no|-o\s*UserKnownHostsFile=/dev/null)'
+  case_sensitive: true 

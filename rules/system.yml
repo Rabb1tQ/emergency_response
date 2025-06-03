@@ -1,0 +1,69 @@
+- id: unauthorized_sudo_config
+  description: 检测可疑的sudo配置
+  level: critical
+  target_section: system
+  pattern: '(NOPASSWD|!authenticate).*ALL'
+  case_sensitive: true
+
+- id: kernel_module_tampering
+  description: 检测可疑的内核模块加载
+  level: high
+  target_section: system
+  pattern: '(insmod|modprobe).*(/tmp/|/dev/shm/)'
+  case_sensitive: true
+
+- id: suspicious_system_info_collection
+  description: 检测可疑的系统信息收集
+  level: medium
+  target_section: system
+  pattern: '(dmidecode|lscpu|lspci|hwinfo).*>(\/tmp\/|\/dev\/shm\/)'
+  case_sensitive: true
+
+- id: disabled_security_features
+  description: 检测被禁用的安全特性
+  level: high
+  target_section: system
+  pattern: '(selinux=0|apparmor=0|audit=0)'
+  case_sensitive: true
+
+- id: unauthorized_kernel_parameter
+  description: 检测未授权的内核参数修改
+  level: critical
+  target_section: system
+  pattern: '(kernel\..*=(0|1))'
+  case_sensitive: true
+
+- id: suspicious_system_user_creation
+  description: 检测可疑系统用户创建
+  level: high
+  target_section: system
+  pattern: 'useradd.*(-ou 0|-g 0|-s \/bin\/bash)'
+  case_sensitive: true
+
+- id: system_time_manipulation
+  description: 检测系统时间异常修改
+  level: medium
+  target_section: system
+  pattern: '(date\s+-s|ntpdate\s+-u)'
+  case_sensitive: true
+
+- id: unauthorized_core_dump
+  description: 检测未授权的核心转储配置
+  level: high
+  target_section: system
+  pattern: '(core_pattern=|soft.*core.*unlimited)'
+  case_sensitive: true
+
+- id: suspicious_system_environment
+  description: 检测可疑的系统环境变量
+  level: medium
+  target_section: system
+  pattern: '(LD_PRELOAD|LD_LIBRARY_PATH)=.*\/'
+  case_sensitive: true
+
+- id: system_resource_exhaustion
+  description: 检测系统资源耗尽配置
+  level: medium
+  target_section: system
+  pattern: '(ulimit\s+-[adfmstv]|unlimited)'
+  case_sensitive: true 

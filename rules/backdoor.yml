@@ -1,0 +1,63 @@
+- id: non_root_uid0
+  description: 发现非root用户具有UID 0
+  level: critical
+  target_section: backdoor
+  pattern: '^(?!root:).*:x:0:0:'
+  case_sensitive: true
+
+- id: suspicious_cron_download
+  description: 计划任务中包含高风险下载命令
+  level: high
+  target_section: backdoor
+  pattern: '(wget\s+.*\s+-O\s+/|curl\s+.*\s+--output\s+/|python\s+-c\s*[\'"].*requests\.get\()'
+  case_sensitive: true
+
+- id: hidden_startup_script
+  description: 检测隐藏的启动脚本
+  level: high
+  target_section: backdoor
+  pattern: '(/tmp/\.|/dev/shm/\.|/var/tmp/\.).*\.(sh|py|pl)$'
+  case_sensitive: true
+
+- id: unauthorized_suid_script
+  description: 检测可疑的SUID脚本
+  level: critical
+  target_section: backdoor
+  pattern: '(find|nc|netcat|python|perl|php|ruby).*\s+-perm\s+-4000'
+  case_sensitive: true
+
+- id: reverse_shell_startup
+  description: 检测反向Shell启动项
+  level: critical
+  target_section: backdoor
+  pattern: '(bash\s+-i\s*>|python\s+-c\s*[\'"].*socket\.socket\(.*\)|nc\s+-e\s+|perl\s+-e\s*.*\s+fork\s*\()'
+  case_sensitive: true
+
+- id: webshell_detection
+  description: 检测常见WebShell特征
+  level: critical
+  target_section: backdoor
+  pattern: '(eval\s*\(\s*\$_(POST|GET|REQUEST)|base64_decode\s*\(\s*\$_(POST|GET|REQUEST)|system\s*\(\s*\$_(POST|GET|REQUEST))'
+  case_sensitive: true
+
+- id: rootkit_detection
+  description: 检测常见Rootkit特征
+  level: critical
+  target_section: backdoor
+  pattern: '(\/dev\/.*?(hide|invisible)|\/proc\/\d+\/maps.*?(hide|invisible)|\/sys\/kernel\/debug.*?(hide|invisible))'
+  case_sensitive: true
+
+- id: memory_injection
+  description: 检测内存注入特征
+  level: high
+  target_section: backdoor
+  pattern: '(ptrace\s+.*\s+PTRACE_POKEDATA|\/proc\/\d+\/mem.*\s+w\+|mmap.*\s+PROT_EXEC)'
+  case_sensitive: true
+
+- id: suspicious_binary_modification
+  description: 检测系统关键二进制文件修改
+  level: critical
+  target_section: backdoor
+  pattern: '(\/bin\/ps|\/bin\/netstat|\/bin\/ls|\/bin\/top|\/usr\/bin\/sudo).*\s+\d{10}'
+  case_sensitive: true
+

@@ -1,0 +1,69 @@
+- id: known_malicious_ports
+  description: 检测已知恶意端口
+  level: high
+  target_section: network
+  pattern: '(?:^|\s)(4444|5555|6666|6969|31337|1337|12345|8080|8888|9999)(?:\s|$)'
+  case_sensitive: true
+
+- id: potential_c2_connection
+  description: 检测可能的命令与控制连接
+  level: critical
+  target_section: network
+  pattern: '(ESTABLISHED|LISTEN).*?(nc\s+-e|python\s+-c\s*[\'"].*socket\.socket\(.*bind\(|perl\s+-e.*fork|bash\s+-i)'
+  case_sensitive: true
+
+- id: dns_exfiltration
+  description: 高级DNS数据隧道检测
+  level: high
+  target_section: network
+  pattern: '(?:dig|nslookup).*[a-zA-Z0-9+/]{20,}|(?:.*\.)(dnsalias|dynamic-dns|afraid|no-ip|dyndns|hopto|serveo|ngrok)\.'
+  case_sensitive: true
+
+- id: tor_network_connection
+  description: 检测Tor网络连接
+  level: medium
+  target_section: network
+  pattern: '(ESTABLISHED|LISTEN).*?(tor|onion|.exit|9001|9030|9050|9051)'
+  case_sensitive: true
+
+- id: suspicious_external_connection
+  description: 检测可疑的外部连接
+  level: high
+  target_section: network
+  pattern: '(ESTABLISHED).*?(country:CN|country:RU|country:IR|country:KP).*?(ssh|telnet|rdp|5900|3389)'
+  case_sensitive: true
+
+- id: crypto_mining_connection
+  description: 检测加密货币挖矿连接
+  level: high
+  target_section: network
+  pattern: '(stratum\+tcp|xmr\.pool|eth\.pool|btc\.pool|\.(xyz|ru|cn).*:3333)'
+  case_sensitive: true
+
+- id: data_exfiltration
+  description: 检测数据外泄
+  level: critical
+  target_section: network
+  pattern: '(ESTABLISHED).*?(pastebin\.com|transfer\.sh|mega\.nz|anonfiles\.com|wetransfer\.com)'
+  case_sensitive: true
+
+- id: proxy_tunnel_detection
+  description: 检测代理隧道
+  level: high
+  target_section: network
+  pattern: '(ESTABLISHED|LISTEN).*?(socks5|http_proxy|sock4|tunnel|proxy\..*:8080)'
+  case_sensitive: true
+
+- id: suspicious_protocol
+  description: 检测可疑协议使用
+  level: medium
+  target_section: network
+  pattern: '(ESTABLISHED|LISTEN).*?(6379|11211|27017|5432|3306).*?(?!localhost|127\.0\.0\.1)'
+  case_sensitive: true
+
+- id: vpn_tunnel_detection
+  description: 检测VPN隧道
+  level: medium
+  target_section: network
+  pattern: '(tun[0-9]|tap[0-9]|ppp[0-9]|openvpn|wireguard|ipsec)'
+  case_sensitive: true
