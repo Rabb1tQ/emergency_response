@@ -9,7 +9,7 @@
   description: 检测可能的命令与控制连接
   level: critical
   target_section: network
-  pattern: '(ESTABLISHED|LISTEN).*?(nc\s+-e|python\s+-c\s*[\'"].*socket\.socket\(.*bind\(|perl\s+-e.*fork|bash\s+-i)'
+  pattern: "(ESTABLISHED|LISTEN).*?(nc\\s+-e|python\\s+-c\\s*['\"].*?socket\\.socket\\(.*?bind\\(|perl\\s+-e.*?fork|bash\\s+-i)"
   case_sensitive: true
 
 - id: dns_exfiltration

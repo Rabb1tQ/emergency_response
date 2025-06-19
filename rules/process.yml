@@ -23,7 +23,7 @@
   description: 检测反向Shell进程
   level: critical
   target_section: process
-  pattern: '(bash\s+-i|python\s+-c\s*[\'"].*socket\.socket\(.*\))'
+  pattern: "(bash\\s+-i|python\\s+-c\\s*['\"].*?socket\\.socket\\(.*?\\))"
   case_sensitive: true
 
 - id: obfuscated_process_command
@@ -44,7 +44,7 @@
   description: 检测未授权的解释器
   level: high
   target_section: process
-  pattern: '(python[23]?|perl|ruby|lua)\s+-c\s*[\'"].*\''
+  pattern: "(python[23]?|perl|ruby|lua)\\s+-c\\s*['\"].*?['\"]"
   case_sensitive: true
 
 - id: process_injection_indicator

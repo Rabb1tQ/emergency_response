@@ -9,7 +9,7 @@
   description: 计划任务中包含高风险下载命令
   level: high
   target_section: backdoor
-  pattern: '(wget\s+.*\s+-O\s+/|curl\s+.*\s+--output\s+/|python\s+-c\s*[\'"].*requests\.get\()'
+  pattern: "(wget\\s+.*?\\s+-O\\s+/|curl\\s+.*?\\s+--output\\s+/|python\\s+-c\\s*['\"].*?requests\\.get\\()"
   case_sensitive: true
 
 - id: hidden_startup_script
@@ -30,7 +30,7 @@
   description: 检测反向Shell启动项
   level: critical
   target_section: backdoor
-  pattern: '(bash\s+-i\s*>|python\s+-c\s*[\'"].*socket\.socket\(.*\)|nc\s+-e\s+|perl\s+-e\s*.*\s+fork\s*\()'
+  pattern: "(bash\\s+-i\\s*>|python\\s+-c\\s*['\"].*?socket\\.socket\\(.*?\\)|nc\\s+-e\\s+|perl\\s+-e\\s*.*?\\s+fork\\s*\\()"
   case_sensitive: true
 
 - id: webshell_detection
