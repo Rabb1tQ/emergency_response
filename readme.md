@@ -3,6 +3,7 @@
 ## 项目简介
 这是一个用于Linux系统安全应急响应的工具集，包含一键式信息收集脚本和可视化报告查看器。该工具集能够快速收集系统安全相关信息，并通过基于规则的分析引擎对收集到的信息进行安全风险评估。
 
+注意：先看使用方法部分再提ISSUE！！！！！！！！！！！
 ## 截图：
 ![img.png](img.png)
 
@@ -83,7 +84,12 @@ sudo bash emergency_response.sh
 ```
 脚本会在当前目录生成格式如 `emergency_report_YYYYMMDD_HHMMSS.txt` 的报告文件。
 
-### 2. 查看报告
+### 2. 运行规则引擎：
+```bash
+python rules_engine.py
+```
+
+### 3. 查看报告
 1. 打开 `emergency_report_viewer.html`
 2. 点击"选择文件"按钮，选择生成的报告文件
 3. 点击"分析报告"按钮开始分析
