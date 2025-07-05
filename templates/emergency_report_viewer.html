@@ -570,32 +570,38 @@ function escapeHtml(str) {
   return str.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-  document.getElementById("fileInput").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const text = e.target.result;
-        try {
-          const data = JSON.parse(text);
-          renderTabs(data);
-        } catch (jsonError) {
-          const data = parseTextReport(text);
-          renderTabs(data);
-        }
-      } catch (err) {
-        alert("解析失败：" + err.message);
+document.addEventListener("DOMContentLoaded", function () {
+  fetch('http://localhost:35000/list_reports')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('HTTP请求失败');
       }
-    };
-    reader.readAsText(file);
-  });
-  
-  // 添加搜索导航事件监听
-  document.getElementById("prevMatch").addEventListener("click", () => navigateSearch(-1));
-  document.getElementById("nextMatch").addEventListener("click", () => navigateSearch(1));
+      return response.json();
+    })
+    .then(data => {
+      const select = document.getElementById('reportSelect');
+      // 如果有文件则填充下拉框
+      if (data.files && data.files.length > 0) {
+        data.files.forEach(file => {
+          if (file.endsWith('.txt')) {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file;
+            select.appendChild(option);
+          }
+        });
+      } else {
+        // 如果没有文件，清空下拉框且不提示
+        select.innerHTML = '';
+      }
+    })
+    .catch(error => {
+      console.error('获取报告列表失败:', error);
+      // 只有在网络错误或服务器未运行等情况才提示
+      // alert('无法连接到规则引擎服务器，请确保服务正在运行。');
+    });
 });
+
 
 // 添加侧边栏折叠功能
 function toggleSidebar() {
