@@ -184,6 +184,8 @@ body {
   overflow-x: auto;
   margin: 0;
   font-size: 14px;
+  white-space: pre-wrap; /* 允许自动换行 */
+  word-wrap: break-word; /* 在长单词或URL地址内部进行换行 */
 }
 
 .tabcontent details {
@@ -998,7 +1000,7 @@ function ensureAllSubsections(data) {
   return result;
 }
 function runServerCheck() {
-  const resultDiv = document.getElementById("alertContainer"); // 假设你想把结果显示在告警面板中
+  const resultDiv = document.getElementById("alertContainer");
   resultDiv.innerHTML = '<div class="alert alert-low">正在运行服务器检查，请稍候...</div>';
 
   fetch('/check', {
@@ -1010,15 +1012,27 @@ function runServerCheck() {
         throw new Error(data.error || '未知错误');
       });
     }
-    return response.text(); // 如果返回的是纯文本内容
+    return response.json(); // 改为 json() 来正确解析响应内容
   })
-  .then(output => {
+  .then(data => {
+    let output = '';
+
+    if (typeof data.stdout === 'string') {
+      try {
+        // 尝试将 Unicode 转换为中文
+        output = decodeURIComponent(JSON.parse(`"${data.stdout}"`));
+      } catch (e) {
+        output = data.stdout;
+      }
+    }
+
     resultDiv.innerHTML = `
       <div class="alert alert-medium">
         <strong>服务器检查成功！</strong><br>
         输出信息：<pre>${output}</pre>
       </div>
     `;
+    refreshReportList();
   })
   .catch(error => {
     resultDiv.innerHTML = `
@@ -1028,6 +1042,28 @@ function runServerCheck() {
       </div>
     `;
   });
+}
+//刷新列表
+function refreshReportList() {
+  const select = document.getElementById('reportSelect');
+  select.innerHTML = ''; // 清空现有选项
+
+  fetch('http://localhost:35000/list_reports')
+    .then(response => response.json())
+    .then(data => {
+      data.files.forEach(file => {
+        if (file.endsWith('.txt')) {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file;
+          select.appendChild(option);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('获取报告列表失败:', error);
+      alert('无法连接到规则引擎服务器，请确保服务正在运行。');
+    });
 }
 
 </script>
