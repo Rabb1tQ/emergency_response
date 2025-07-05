@@ -2,8 +2,10 @@
 import yaml
 import re
 import json
+import subprocess
+import os
 from pathlib import Path
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -109,6 +111,73 @@ class RuleEngine:
 
 engine = RuleEngine()
 
+
+def parse_text_report(text):
+    """
+    将原始文本格式的应急响应报告解析为结构化的 dict，
+    结构与前端 parseTextReport() 相同。
+    """
+    sections = text.split("##########################################")
+    result = {}
+
+    for section in sections:
+        if not section.strip():
+            continue
+
+        module_match = re.search(r'模块:\s*(.*?)\n', section)
+        if not module_match:
+            continue
+
+        module_title = module_match.group(1).strip()
+        module_key = next((k for k, v in TAB_TITLES.items() if v == module_title), None)
+        if not module_key:
+            continue
+
+        subsections = re.split(r'------------------------------------------\s*', section)
+        result[module_key] = {}
+
+        i = 1  # 第一个可能是标题
+        while i < len(subsections):
+            title_match = re.search(r'子项:\s*(.*?)\n', subsections[i])
+            if not title_match:
+                i += 1
+                continue
+
+            title = title_match.group(1).strip()
+            content = subsections[i + 1].strip() if i + 1 < len(subsections) else ""
+            result[module_key][title] = content
+            i += 2  # 跳过标题和内容
+
+    return result
+
+
+# 前端定义的 TAB_TITLES 映射表
+TAB_TITLES = {
+    "backdoor": "系统后门排查",
+    "user": "用户与登录检查",
+    "log": "日志分析",
+    "network": "网络检查",
+    "process": "进程检查",
+    "filesystem": "文件系统检查",
+    "package": "软件包检查",
+    "persistence": "持久化检查",
+    "integrity": "系统完整性",
+    "malware": "恶意进程与提权点"
+}
+
+
+@app.route('/list_reports', methods=['GET'])
+def list_reports():
+    try:
+        reports_dir = Path(__file__).parent / 'report'
+        if not reports_dir.exists():
+            return jsonify({'error': 'Report directory not found'}), 404
+
+        # 获取 report 目录下的所有文件名
+        files = [f.name for f in reports_dir.iterdir() if f.is_file()]
+        return jsonify({'files': files})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 @app.route('/analyze', methods=['POST'])
 def analyze():
     try:
@@ -120,5 +189,75 @@ def analyze():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/analyze_file', methods=['POST'])
+def analyze_file():
+    try:
+        # 获取请求中的文件名
+        data = request.get_json()
+        filename = data.get('filename')
+
+        if not filename:
+            return jsonify({'error': 'Filename is required'}), 400
+
+        reports_dir = Path(__file__).parent / 'report'
+        file_path = reports_dir / filename
+
+        if not file_path.exists():
+            return jsonify({'error': 'File not found'}), 404
+
+        # 读取原始文本报告文件
+        with open(file_path, 'r', encoding='utf-8') as f:
+            raw_text = f.read()
+
+        # 解析文本报告为结构化数据
+        report_data = parse_text_report(raw_text)
+
+        # 使用 RuleEngine 分析报告
+        results = engine.analyze_report(report_data)
+        return jsonify(results)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/check', methods=['GET'])
+def run_shell():
+    try:
+        result = subprocess.run(
+            ['./emergency_response.sh'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        return jsonify({
+            'success': True,
+            'stdout': result.stdout,
+            'stderr': result.stderr
+        })
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'stdout': e.stdout,
+            'stderr': e.stderr
+        }), 500
+@app.route('/report/<path:filename>', methods=['GET'])
+def get_report(filename):
+    reports_dir = Path(__file__).parent / 'report'
+    file_path = reports_dir / filename
+
+    if not file_path.exists():
+        return jsonify({'error': 'File not found'}), 404
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    return content, 200, {'Content-Type': 'text/plain'}
+
+@app.route('/')
+def index():
+    return render_template('emergency_report_viewer.html')
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000) 
+    app.run(host='0.0.0.0', port=35000)

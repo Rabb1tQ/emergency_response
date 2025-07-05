@@ -265,7 +265,17 @@ body {
   50% { background: #ff8888; }
   100% { background: #ff4444; }
 }
+.alert-check {
+  background: #fff9c4;
+  color: #827717;
+  border-left: 5px solid #d4af37;
+}
 
+.alert-check pre {
+  background: #fffde7;
+  padding: 10px;
+  font-size: 14px;
+}
 </style>
 <script>
 const TAB_TITLES = {
@@ -497,7 +507,7 @@ function highlightCurrentMatch() {
 // 添加规则引擎API调用
 async function analyzeReport(data) {
   try {
-    const response = await fetch('http://localhost:5000/analyze', {
+    const response = await fetch('http://localhost:35000/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -824,6 +834,202 @@ function debugPosition(section, subsection, start, end) {
     totalOffset += text.length;
   }
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  fetch('http://localhost:35000/list_reports')
+    .then(response => response.json())
+    .then(data => {
+      const select = document.getElementById('reportSelect');
+      data.files.forEach(file => {
+        if (file.endsWith('.txt')) {
+          const option = document.createElement('option');
+          option.value = file;
+          option.textContent = file;
+          select.appendChild(option);
+        }
+      });
+    })
+    .catch(error => {
+      console.error('获取报告列表失败:', error);
+      alert('无法连接到规则引擎服务器，请确保服务正在运行。');
+    });
+
+  // 原有事件监听保留
+  document.getElementById("fileInput").addEventListener("change", handleFileUpload);
+  document.getElementById("prevMatch").addEventListener("click", () => navigateSearch(-1));
+  document.getElementById("nextMatch").addEventListener("click", () => navigateSearch(1));
+});
+
+// 点击“本地分析”按钮，发送选定的文件名到 /analyze_file
+function analyzeSelectedFile() {
+  const selectedFile = document.getElementById('reportSelect').value;
+  if (!selectedFile) {
+    alert("请选择一个报告文件");
+    return;
+  }
+
+  // 直接获取并解析原始报告文件
+  fetch(`http://localhost:35000/report/${encodeURIComponent(selectedFile)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.text();
+    })
+    .then(rawText => {
+      // 解析原始文本报告
+      const parsedData = parseTextReport(rawText);
+
+      // 确保所有子项都有值（避免undefined）
+      const safeData = {};
+      Object.keys(parsedData).forEach(moduleKey => {
+        safeData[moduleKey] = {...parsedData[moduleKey]};
+
+        const subTitles = SUB_TAB_TITLES[moduleKey] || [];
+        subTitles.forEach(subTitle => {
+          if (!(subTitle in safeData[moduleKey])) {
+            safeData[moduleKey][subTitle] = "";
+          }
+        });
+      });
+
+      // 渲染标签页
+      renderTabs(safeData);
+
+      // 同时发送到规则引擎进行分析
+      fetch('http://localhost:35000/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(safeData)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('分析失败');
+        return res.json();
+      })
+      .then(results => {
+        alertResults = results;
+        displayAlerts();
+      })
+      .catch(error => {
+        console.error('规则分析失败:', error);
+        // 如果分析失败，至少显示基本告警面板
+        displayAlerts();
+      });
+    })
+    .catch(error => {
+      console.error('文件加载失败:', error);
+      alert("文件加载失败：" + error.message);
+    });
+}
+
+
+// 显示从接口返回的告警信息
+function displayAlertsFromAPI(results) {
+  const container = document.getElementById('alertContainer');
+  const summary = document.getElementById('alertSummary');
+  container.innerHTML = '';
+  summary.innerHTML = '';
+
+  // 处理所有级别的告警
+  const allAlerts = [];
+  ['high', 'medium', 'low'].forEach(level => {
+    if (results[level] && results[level].length > 0) {
+      results[level].forEach(alert => {
+        allAlerts.push({...alert, level});
+      });
+    }
+  });
+
+  // 如果没有告警
+  if (allAlerts.length === 0) {
+    container.innerHTML = '<div class="alert alert-low">未发现安全告警</div>';
+    return;
+  }
+
+  // 显示统计信息
+  const summaryHtml = `    <div class="alert-badge high">
+      <span>高危告警</span>
+      <span class="count">${results.high ? results.high.length : 0}</span>
+    </div>
+    <div class="alert-badge medium">
+      <span>中危告警</span>
+      <span class="count">${results.medium ? results.medium.length : 0}</span>
+    </div>
+    <div class="alert-badge low">
+      <span>低危告警</span>
+      <span class="count">${results.low ? results.low.length : 0}</span>
+    </div>
+  `;
+  summary.innerHTML = summaryHtml;
+
+  // 显示详细告警信息
+  const alertsHtml = allAlerts.map(alert => {
+    let className = 'alert-low';
+    if (alert.level === 'high') className = 'alert-high';
+    if (alert.level === 'medium') className = 'alert-medium';
+
+    return `      <div class="alert ${className}">
+        <strong>${alert.description || '未知告警'}</strong><br>
+        规则ID: ${alert.rule_id || 'N/A'} |
+        模块: ${alert.section || 'N/A'} |
+        子项: ${alert.subsection || 'N/A'}      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = alertsHtml;
+}
+
+function ensureAllSubsections(data) {
+  const result = {...data};
+  Object.keys(TAB_TITLES).forEach(moduleKey => {
+    if (!result[moduleKey]) {
+      result[moduleKey] = {};
+    }
+
+    const subTitles = SUB_TAB_TITLES[moduleKey] || [];
+    subTitles.forEach(subTitle => {
+      if (!result[moduleKey][subTitle]) {
+        result[moduleKey][subTitle] = "";
+      }
+    });
+  });
+  return result;
+}
+function runServerCheck() {
+  const resultDiv = document.getElementById("alertContainer"); // 假设你想把结果显示在告警面板中
+  resultDiv.innerHTML = '<div class="alert alert-low">正在运行服务器检查，请稍候...</div>';
+
+  fetch('/check', {
+    method: 'GET'
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(data => {
+        throw new Error(data.error || '未知错误');
+      });
+    }
+    return response.text(); // 如果返回的是纯文本内容
+  })
+  .then(output => {
+    resultDiv.innerHTML = `
+      <div class="alert alert-medium">
+        <strong>服务器检查成功！</strong><br>
+        输出信息：<pre>${output}</pre>
+      </div>
+    `;
+  })
+  .catch(error => {
+    resultDiv.innerHTML = `
+      <div class="alert alert-high">
+        <strong>服务器检查失败：</strong><br>
+        ${error.message}
+      </div>
+    `;
+  });
+}
+
 </script>
 </head>
 <body>
@@ -832,6 +1038,12 @@ function debugPosition(section, subsection, start, end) {
   <div style="display: flex; gap: 10px; align-items: center;">
     <input type="file" id="fileInput" accept=".txt,.json">
     <button onclick="analyzeCurrentData()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">分析报告</button>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <label for="reportSelect">选择报告:</label>
+    <select id="reportSelect" style="padding: 8px;"></select>
+    <button onclick="analyzeSelectedFile()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">本地分析</button>
+    <button id="runCheckButton" onclick="runServerCheck()" style="padding: 8px 15px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">运行服务器检查</button>
   </div>
   <div class="search-container">
     <input type="text" id="searchInput" onkeyup="searchTabs()" placeholder="输入关键词高亮...">

@@ -3,7 +3,7 @@
 # 运行方式：sudo bash emergency_response.sh
 
 NOW=$(date +"%Y%m%d_%H%M%S")
-REPORT="emergency_report_${NOW}.txt"
+REPORT="report/emergency_report_${NOW}.txt"
 TMPDIR=$(mktemp -d /tmp/emergency.XXXXXX)
 
 # 定义分隔符
@@ -22,6 +22,10 @@ if [ -f /etc/os-release ]; then
   OS=$ID
 else
   OS=$(uname -s)
+fi
+
+if [ ! -d "report" ]; then
+    mkdir -p report
 fi
 
 declare -A TAB_TITLES=(
