@@ -1026,14 +1026,13 @@ function runServerCheck() {
         throw new Error(data.error || '未知错误');
       });
     }
-    return response.json(); // 改为 json() 来正确解析响应内容
+    return response.json();
   })
   .then(data => {
     let output = '';
 
     if (typeof data.stdout === 'string') {
       try {
-        // 尝试将 Unicode 转换为中文
         output = decodeURIComponent(JSON.parse(`"${data.stdout}"`));
       } catch (e) {
         output = data.stdout;
@@ -1046,7 +1045,10 @@ function runServerCheck() {
         输出信息：<pre>${output}</pre>
       </div>
     `;
+
+    // ✅ 检查完成之后刷新报告列表
     refreshReportList();
+
   })
   .catch(error => {
     resultDiv.innerHTML = `
@@ -1055,36 +1057,54 @@ function runServerCheck() {
         ${error.message}
       </div>
     `;
+    // 即使失败也尝试刷新列表
+    refreshReportList();
   });
 }
+
 //刷新列表
 function refreshReportList() {
   const select = document.getElementById('reportSelect');
   select.innerHTML = ''; // 清空现有选项
 
   fetch('http://localhost:35000/list_reports')
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('HTTP请求失败');
+      }
+      return response.json();
+    })
     .then(data => {
-      data.files.forEach(file => {
-        if (file.endsWith('.txt')) {
-          const option = document.createElement('option');
-          option.value = file;
-          option.textContent = file;
-          select.appendChild(option);
-        }
-      });
+      if (data.files && data.files.length > 0) {
+        data.files.forEach(file => {
+          if (file.endsWith('.txt')) {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file;
+            select.appendChild(option);
+          }
+        });
+      } else {
+        // 可选：添加一个提示项
+        const option = document.createElement('option');
+        option.disabled = true;
+        option.textContent = '暂无可用报告';
+        select.appendChild(option);
+      }
     })
     .catch(error => {
       console.error('获取报告列表失败:', error);
-      alert('无法连接到规则引擎服务器，请确保服务正在运行。');
+      // 可选：显示错误或重置下拉框
+      select.innerHTML = '';
     });
 }
+
 
 </script>
 </head>
 <body>
 <div class="header">
-  <h1>Linux 应急响应报告查看器</h1>
+  <h1>服务器应急检测工具</h1>
   <div style="display: flex; gap: 10px; align-items: center;">
     <input type="file" id="fileInput" accept=".txt,.json">
     <button onclick="analyzeCurrentData()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">分析报告</button>
