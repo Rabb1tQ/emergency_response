@@ -171,7 +171,7 @@ def list_reports():
     try:
         reports_dir = Path(__file__).parent / 'report'
         if not reports_dir.exists():
-            return jsonify({'error': 'Report directory not found'}), 404
+            return jsonify({'files': ''}),200
 
         # 获取 report 目录下的所有文件名
         files = [f.name for f in reports_dir.iterdir() if f.is_file()]
