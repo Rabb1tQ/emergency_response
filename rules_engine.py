@@ -9,7 +9,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app, resources={r"/list_reports": {"origins": "*"}})
+CORS(app)
 
 class RuleEngine:
     def __init__(self):
