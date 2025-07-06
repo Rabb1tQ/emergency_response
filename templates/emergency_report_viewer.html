@@ -290,8 +290,7 @@ const TAB_TITLES = {
   package: "软件包检查",
   persistence: "持久化检查",
   integrity: "系统完整性",
-  malware: "恶意进程与提权点",
-  // summary: "功能总结与使用说明"
+  malware: "恶意进程与提权点"
 };
 
 const SUB_TAB_TITLES = {
@@ -304,235 +303,202 @@ const SUB_TAB_TITLES = {
   package: ["已安装的软件包"],
   persistence: ["自启动服务", "计划任务", "SSH公钥", "启动项配置"],
   integrity: ["关键二进制文件校验", "系统文件完整性"],
-  malware: ["可疑进程", "可疑提权点", "隐藏文件"],
-  // summary: ["功能说明"]
+  malware: ["可疑进程", "可疑提权点", "隐藏文件"]
 };
 
 let gTabs = Object.keys(TAB_TITLES);
-let gContent = "";
-let currentSearchIndex = -1;
-let searchResults = [];
+let currentReportFiles = []; // 缓存报告文件列表
+let alertResults = { high: [], medium: [], low: }; // 告警结果存储
 
-// 告警结果存储
-let alertResults = {
-  high: [],
-  medium: [],
-  low: []
-};
+// ========== 报告下拉框加载 ==========
+function loadReports(refresh = false) {
+  fetch('/list_reports')
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP请求失败');
+      return response.json();
+    })
+    .then(data => {
+      currentReportFiles = data.files || [];
+      updateReportSelect(currentReportFiles);
 
-function parseTextReport(text) {
-  const sections = text.split("##########################################");
-  const data = {};
-  let currentSection = null;
-  
-  for (const section of sections) {
-    if (!section.trim()) continue;
-    
-    const moduleMatch = section.match(/模块: (.*?)\n/);
-    if (!moduleMatch) continue;
-    
-    const moduleTitle = moduleMatch[1];
-    const moduleKey = Object.keys(TAB_TITLES).find(key => TAB_TITLES[key] === moduleTitle);
-    if (!moduleKey) continue;
-    
-    const subSections = section.split("------------------------------------------");
-    data[moduleKey] = {};
-    
-    for (let i = 1; i < subSections.length; i += 2) {
-      const titleMatch = subSections[i].match(/子项: (.*?)\n/);
-      if (!titleMatch) continue;
-      const title = titleMatch[1];
-      const content = subSections[i + 1] ? subSections[i + 1].trim() : "";
-      data[moduleKey][title] = content;
-    }
-  }
-  
-  return data;
-}
-
-function openTab(evt, tabName) {
-  const tabcontent = document.getElementsByClassName("tabcontent");
-  for (let i = 0; i < tabcontent.length; i++) {
-    tabcontent[i].style.display = "none";
-  }
-  const tablinks = document.getElementsByClassName("tablinks");
-  for (let i = 0; i < tablinks.length; i++) {
-    tablinks[i].className = tablinks[i].className.replace(" active", "");
-  }
-  document.getElementById(tabName).style.display = "block";
-  evt.currentTarget.className += " active";
-}
-
-function findAllMatches(text, searchTerm) {
-  if (!searchTerm) return [];
-  const regex = new RegExp(searchTerm, 'gi');
-  const matches = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    matches.push({
-      index: match.index,
-      text: match[0],
-      position: matches.length,
-      end: match.index + match[0].length
+      if (refresh) {
+        console.log('✅ 列表已刷新');
+      } else {
+        console.log('✅ 初次加载完成');
+      }
+    })
+    .catch(error => {
+      console.error('获取报告列表失败:', error);
+      updateReportSelect([]);
     });
-  }
-  return matches;
 }
 
-function searchTabs() {
-  const input = document.getElementById("searchInput").value.toLowerCase();
-  if (!input) {
-    updateSearchCount(0, -1);
+function updateReportSelect(files) {
+  const select = document.getElementById('reportSelect');
+  select.innerHTML = ''; // 每次更新前清空
+
+  if (files && files.length > 0) {
+    files.forEach(file => {
+      if (file.endsWith('.txt')) {
+        const option = document.createElement('option');
+        option.value = file;
+        option.textContent = file;
+        select.appendChild(option);
+      }
+    });
+  } else {
+    const option = document.createElement('option');
+    option.disabled = true;
+    option.textContent = '暂无可用报告';
+    select.appendChild(option);
+  }
+}
+
+// ========== 页面初始化 ==========
+document.addEventListener("DOMContentLoaded", function () {
+  loadReports(); // 初次加载
+});
+
+// ========== 手动刷新 ==========
+function runServerCheck() {
+  const resultDiv = document.getElementById("alertContainer");
+  resultDiv.innerHTML = '<div class="alert alert-low">正在运行服务器检查，请稍候...</div>';
+
+  fetch('/check', { method: 'GET' })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().then(data => {
+          throw new Error(data.error || '未知错误');
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      let output = '';
+      if (typeof data.stdout === 'string') {
+        try {
+          output = decodeURIComponent(JSON.parse(`"${data.stdout}"`));
+        } catch (e) {
+          output = data.stdout;
+        }
+      }
+
+      resultDiv.innerHTML = `
+        <div class="alert alert-medium">
+          <strong>服务器检查成功！</strong><br>
+          输出信息：<pre>${output}</pre>
+        </div>
+      `;
+
+      loadReports(true); // 设置为刷新模式
+    })
+    .catch(error => {
+      resultDiv.innerHTML = `
+        <div class="alert alert-high">
+          <strong>服务器检查失败：</strong><br>
+          ${error.message}
+        </div>
+      `;
+      loadReports(true); // 即使失败也尝试刷新
+    });
+}
+
+// ========== 分析按钮 ==========
+function analyzeSelectedFile() {
+  const selectedFile = document.getElementById('reportSelect').value;
+  if (!selectedFile) {
+    alert("请选择一个报告文件");
     return;
   }
 
-  searchResults = [];
-  currentSearchIndex = -1;
-  
-  const tabs = document.getElementsByClassName("tabcontent");
-  for (let i = 0; i < tabs.length; i++) {
-    const tabId = tabs[i].id;
-    const pres = tabs[i].getElementsByTagName("pre");
-    for (let j = 0; j < pres.length; j++) {
-      const preText = pres[j].textContent;
-      const matches = findAllMatches(preText, input);
-      matches.forEach(match => {
-        searchResults.push({
-          tabId,
-          preIndex: j,
-          ...match
+  fetch(`http://localhost:35000/report/${encodeURIComponent(selectedFile)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.text();
+    })
+    .then(rawText => {
+      const parsedData = parseTextReport(rawText);
+      const safeData = ensureAllSubsections(parsedData);
+
+      renderTabs(safeData);
+
+      fetch('http://localhost:35000/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(safeData)
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('分析失败');
+          return res.json();
+        })
+        .then(results => {
+          alertResults = results;
+          displayAlerts();
+        })
+        .catch(error => {
+          console.error('规则分析失败:', error);
+          displayAlerts();
         });
-      });
-    }
-  }
-  
-  highlightCurrentMatch();
-  updateSearchCount(searchResults.length, currentSearchIndex);
+    })
+    .catch(error => {
+      console.error('文件加载失败:', error);
+      alert("文件加载失败：" + error.message);
+    });
 }
 
-function updateSearchCount(total, current) {
-  const countElement = document.getElementById("searchCount");
-  if (total === 0) {
-    countElement.textContent = "未找到匹配项";
-    document.getElementById("prevMatch").disabled = true;
-    document.getElementById("nextMatch").disabled = true;
-  } else {
-    countElement.textContent = `${current + 1}/${total}`;
-    document.getElementById("prevMatch").disabled = current <= 0;
-    document.getElementById("nextMatch").disabled = current >= total - 1;
+function analyzeCurrentData() {
+  const fileInput = document.getElementById('fileInput');
+  if (!fileInput.files.length) {
+    alert('请先上传文件');
+    return;
   }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const text = e.target.result;
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (jsonError) {
+        data = parseTextReport(text);
+      }
+      renderTabs(data);
+      analyzeReport(data);
+    } catch (err) {
+      alert("分析失败：" + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
-function navigateSearch(direction) {
-  if (searchResults.length === 0) return;
-  
-  currentSearchIndex += direction;
-  if (currentSearchIndex < 0) currentSearchIndex = searchResults.length - 1;
-  if (currentSearchIndex >= searchResults.length) currentSearchIndex = 0;
-  
-  highlightCurrentMatch();
-  updateSearchCount(searchResults.length, currentSearchIndex);
-}
-
-function highlightCurrentMatch() {
-  // 清除所有高亮
-  const tabs = document.getElementsByClassName("tabcontent");
-  for (let i = 0; i < tabs.length; i++) {
-    const pres = tabs[i].getElementsByTagName("pre");
-    for (let j = 0; j < pres.length; j++) {
-      let html = pres[j].innerHTML.replace(/<span class="mark.*?">(.*?)<\/span>/g, "$1");
-      pres[j].innerHTML = html;
-    }
-  }
-  
-  if (searchResults.length === 0 || currentSearchIndex === -1) return;
-  
-  const currentMatch = searchResults[currentSearchIndex];
-  
-  // 切换到对应的标签页
-  const tabButton = document.querySelector(`button[onclick="openTab(event, '${currentMatch.tabId}')"]`);
-  if (tabButton) {
-    tabButton.click();
-  }
-  
-  // 高亮所有匹配项，当前匹配项特殊高亮
-  const searchTerm = document.getElementById("searchInput").value;
-  const regex = new RegExp(`(${searchTerm})`, 'gi');
-  const targetPre = document.getElementById(currentMatch.tabId)
-    .getElementsByTagName("pre")[currentMatch.preIndex];
-  
-  targetPre.innerHTML = targetPre.textContent.replace(regex, (match, p1, offset) => {
-    const isCurrentMatch = offset === currentMatch.index;
-    return `<span class="mark${isCurrentMatch ? ' current' : ''}">${match}</span>`;
-  });
-  
-  // 找到当前匹配项的元素
-  const currentElement = targetPre.querySelector('.mark.current');
-  if (currentElement) {
-    // 获取父级details元素
-    const detailsElement = targetPre.closest('details');
-    if (detailsElement && !detailsElement.open) {
-      detailsElement.open = true;
-    }
-    
-    // 计算滚动位置
-    const contentContainer = document.querySelector('.content-container');
-    const elementRect = currentElement.getBoundingClientRect();
-    const containerRect = contentContainer.getBoundingClientRect();
-    
-    // 检查元素是否在视图中
-    const isInView = (
-      elementRect.top >= containerRect.top &&
-      elementRect.bottom <= containerRect.bottom
-    );
-    
-    if (!isInView) {
-      // 计算理想的滚动位置（将匹配项放在容器中间）
-      const elementTop = elementRect.top + contentContainer.scrollTop - containerRect.top;
-      const containerMiddle = containerRect.height / 2;
-      const scrollTo = elementTop - containerMiddle + elementRect.height / 2;
-      
-      // 平滑滚动到目标位置
-      contentContainer.scrollTo({
-        top: scrollTo,
-        behavior: 'smooth'
-      });
-    }
-    
-    // 添加闪烁动画以突出显示当前匹配项
-    currentElement.style.animation = 'none';
-    currentElement.offsetHeight; // 触发重绘
-    currentElement.style.animation = 'highlight-pulse 1s';
-  }
-}
-
-// 添加规则引擎API调用
+// ========== 规则引擎调用 ==========
 async function analyzeReport(data) {
   try {
     const response = await fetch('http://localhost:35000/analyze', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const results = await response.json();
     alertResults = results;
     displayAlerts();
   } catch (error) {
     console.error('规则分析失败:', error);
-    // 显示错误提示
     const container = document.getElementById('alertContainer');
     container.innerHTML = `
       <div class="alert alert-high">
         <div>
           <strong>规则分析失败</strong>
-          <p>无法连接到规则引擎服务器，请确保服务器正在运行。</p>
+          <p>无法连接到规则引擎服务器，请确保服务正在运行。</p>
           <p>错误信息: ${error.message}</p>
         </div>
       </div>
@@ -540,29 +506,28 @@ async function analyzeReport(data) {
   }
 }
 
-// 修改renderTabs函数
+// ========== 渲染 Tabs 和 内容 ==========
 function renderTabs(data) {
-  const tabBtnHtml = gTabs.map((k, i) => 
+  const tabBtnHtml = gTabs.map((k, i) =>
     `<button class="tablinks" onclick="openTab(event, '${k}')">${TAB_TITLES[k]}</button>`
   ).join("");
   document.getElementById("tabBtns").innerHTML = tabBtnHtml;
 
   const tabContentHtml = gTabs.map(k => {
-    const subTitles = SUB_TAB_TITLES[k];
+    const subTitles = SUB_TAB_TITLES[k] || [];
     const subContent = subTitles.map(title => {
       const content = data[k] && data[k][title] ? data[k][title] : "";
       return `<details open><summary>${title}</summary><pre>${escapeHtml(content)}</pre></details>`;
     }).join("");
+
     return `<div id="${k}" class="tabcontent">${subContent}</div>`;
   }).join("");
+
   document.getElementById("tabContents").innerHTML = tabContentHtml;
 
   if (gTabs.length) {
     setTimeout(() => document.getElementsByClassName("tablinks")[0].click(), 100);
   }
-  
-  // 调用规则引擎API进行分析
-  analyzeReport(data);
 }
 
 function escapeHtml(str) {
@@ -570,61 +535,82 @@ function escapeHtml(str) {
   return str.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-  const select = document.getElementById('reportSelect');
-
-  fetch('/list_reports')
-    .then(response => {
-      if (!response.ok) throw new Error('HTTP请求失败');
-      return response.json();
-    })
-    .then(data => {
-      console.log('✅ 接收到报告列表:', data);
-
-      select.innerHTML = ''; // 清空旧内容
-
-      if (data.files && data.files.length > 0) {
-        data.files.forEach(file => {
-          if (file.endsWith('.txt')) {
-            const option = document.createElement('option');
-            option.value = file;
-            option.textContent = file;
-            select.appendChild(option);
-            console.log('📌 添加选项:', file);
-          }
-        });
-      }
-    })
-    .catch(error => {
-      console.error('❌ 获取报告列表失败:', error);
-      select.innerHTML = '';
-    });
-});
-
-
-// 添加侧边栏折叠功能
-function toggleSidebar() {
-  const sidebar = document.querySelector('.sidebar');
-  const button = document.querySelector('.collapse-button');
-  if (sidebar.style.width === '0px') {
-    sidebar.style.width = '300px';
-    button.textContent = '收起告警面板 >';
-  } else {
-    sidebar.style.width = '0px';
-    button.textContent = '< 展开告警面板';
+// ========== Tab 控制 ==========
+function openTab(evt, tabName) {
+  const tabcontent = document.getElementsByClassName("tabcontent");
+  for (let i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
   }
+
+  const tablinks = document.getElementsByClassName("tablinks");
+  for (let i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+
+  document.getElementById(tabName).style.display = "block";
+  evt.currentTarget.className += " active";
 }
 
-// 添加显示告警的函数
+// ========== 解析文本报告 ==========
+function parseTextReport(text) {
+  const sections = text.split("##########################################");
+  const data = {};
+
+  for (const section of sections) {
+    if (!section.trim()) continue;
+
+    const moduleMatch = section.match(/模块:\s*(.*?)\n/);
+    if (!moduleMatch) continue;
+
+    const moduleTitle = moduleMatch[1].trim();
+    const moduleKey = Object.keys(TAB_TITLES).find(key => TAB_TITLES[key] === moduleTitle);
+    if (!moduleKey) continue;
+
+    const subSections = section.split("------------------------------------------");
+    data[moduleKey] = {};
+    let i = 1;
+
+    while (i < subSections.length) {
+      const titleMatch = subSections[i].match(/子项:\s*(.*?)\n/);
+      if (!titleMatch) {
+        i++;
+        continue;
+      }
+
+      const title = titleMatch[1].trim();
+      const content = subSections[i + 1]?.trim() || "";
+      data[moduleKey][title] = content;
+      i += 2;
+    }
+  }
+
+  return data;
+}
+
+// ========== 确保所有子项都有默认值 ==========
+function ensureAllSubsections(data) {
+  const result = {...data};
+  Object.keys(TAB_TITLES).forEach(moduleKey => {
+    if (!result[moduleKey]) result[moduleKey] = {};
+
+    const subTitles = SUB_TAB_TITLES[moduleKey] || [];
+    subTitles.forEach(subTitle => {
+      if (!(subTitle in result[moduleKey])) {
+        result[moduleKey][subTitle] = "";
+      }
+    });
+  });
+  return result;
+}
+
+// ========== 显示告警 ==========
 function displayAlerts() {
   const container = document.getElementById('alertContainer');
   const summary = document.getElementById('alertSummary');
-  
-  // 清空现有内容
+
   container.innerHTML = '';
   summary.innerHTML = '';
-  
-  // 显示告警统计
+
   const summaryHtml = `
     <div class="alert-badge high">
       <span>高危告警</span>
@@ -640,8 +626,7 @@ function displayAlerts() {
     </div>
   `;
   summary.innerHTML = summaryHtml;
-  
-  // 显示告警详情
+
   const alertsHtml = [
     ...alertResults.high.map(alert => `
       <div class="alert alert-high">
@@ -650,18 +635,16 @@ function displayAlerts() {
           <div style="margin-top: 5px; font-size: 12px; color: #666;">
             规则ID: ${alert.rule_id} | 模块: ${alert.section} | 子项: ${alert.subsection}
           </div>
-          ${alert.findings ? `
-            <div style="margin-top: 10px;">
-              <strong>发现:</strong>
-              <ul style="margin: 5px 0; padding-left: 20px;">
-                ${alert.findings.map(finding => `
-                  <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
-                    位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          ` : ''}
+          <div style="margin-top: 10px;">
+            <strong>发现:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+              ${alert.findings.map(finding => `
+                <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
+                  位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
+                </li>
+              `).join('')}
+            </ul>
+          </div>
         </div>
       </div>
     `),
@@ -672,18 +655,16 @@ function displayAlerts() {
           <div style="margin-top: 5px; font-size: 12px; color: #666;">
             规则ID: ${alert.rule_id} | 模块: ${alert.section} | 子项: ${alert.subsection}
           </div>
-          ${alert.findings ? `
-            <div style="margin-top: 10px;">
-              <strong>发现:</strong>
-              <ul style="margin: 5px 0; padding-left: 20px;">
-                ${alert.findings.map(finding => `
-                  <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
-                    位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          ` : ''}
+          <div style="margin-top: 10px;">
+            <strong>发现:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+              ${alert.findings.map(finding => `
+                <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
+                  位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
+                </li>
+              `).join('')}
+            </ul>
+          </div>
         </div>
       </div>
     `),
@@ -694,412 +675,130 @@ function displayAlerts() {
           <div style="margin-top: 5px; font-size: 12px; color: #666;">
             规则ID: ${alert.rule_id} | 模块: ${alert.section} | 子项: ${alert.subsection}
           </div>
-          ${alert.findings ? `
-            <div style="margin-top: 10px;">
-              <strong>发现:</strong>
-              <ul style="margin: 5px 0; padding-left: 20px;">
-                ${alert.findings.map(finding => `
-                  <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
-                    位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
-                  </li>
-                `).join('')}
-              </ul>
-            </div>
-          ` : ''}
+          <div style="margin-top: 10px;">
+            <strong>发现:</strong>
+            <ul style="margin: 5px 0; padding-left: 20px;">
+              ${alert.findings.map(finding => `
+                <li style="cursor: pointer;" onclick="scrollToPosition('${alert.section}', '${alert.subsection}', ${finding.start}, ${finding.end})">
+                  位置: ${finding.start}-${finding.end}, 匹配文本: "${finding.matched_text}"
+                </li>
+              `).join('')}
+            </ul>
+          </div>
         </div>
       </div>
     `)
   ].join('');
-  
+
   container.innerHTML = alertsHtml;
 }
 
-// 添加分析按钮点击事件处理函数
-function analyzeCurrentData() {
-  const fileInput = document.getElementById('fileInput');
-  if (!fileInput.files.length) {
-    alert('请先上传文件');
-    return;
-  }
-  
-  const file = fileInput.files[0];
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const text = e.target.result;
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch (jsonError) {
-        data = parseTextReport(text);
-      }
-      // 先渲染标签页
-      renderTabs(data);
-      // 然后分析报告
-      analyzeReport(data);
-    } catch (err) {
-      alert("分析失败：" + err.message);
-    }
-  };
-  reader.readAsText(file);
-}
-
-// 添加跳转到指定位置的函数
+// ========== 跳转至指定位置 ==========
 function scrollToPosition(section, subsection, start, end) {
-  // 切换到对应的标签页
   const tabButton = document.querySelector(`button[onclick="openTab(event, '${section}')"]`);
-  if (tabButton) {
-    tabButton.click();
-  }
+  if (tabButton) tabButton.click();
 
-  // 延迟执行，确保tab内容已渲染
   setTimeout(() => {
     const details = document.querySelectorAll(`#${section} details`);
-    let totalOffset = 0; // 用于跟踪在所有pre标签中的累积偏移量
-    
+    let totalOffset = 0;
+
     for (const detail of details) {
       const summary = detail.querySelector('summary');
-      if (!summary) continue;
-      
       const pre = detail.querySelector('pre');
       if (!pre) continue;
-      
+
       const text = pre.textContent;
       const textLength = text.length;
-      
-      // 检查目标位置是否在当前pre标签的范围内
+
       if (start >= totalOffset && start < totalOffset + textLength) {
         detail.open = true;
-        
-        // 计算相对于当前pre的位置
         const relativeStart = start - totalOffset;
-        const relativeEnd = Math.min(end - totalOffset, textLength);
-        
-        // 获取目标文本
+        const relativeEnd = end - totalOffset;
+
         const targetText = text.substring(relativeStart, relativeEnd);
-        
-        // 清除所有现有高亮
-        pre.innerHTML = escapeHtml(text);
-        
-        // 重新计算位置并高亮
         const beforeText = text.substring(0, relativeStart);
         const afterText = text.substring(relativeEnd);
-        
+
         pre.innerHTML = escapeHtml(beforeText) +
           `<span class="mark current" style="animation: highlight-pulse 1s;">${escapeHtml(targetText)}</span>` +
           escapeHtml(afterText);
-        
-        // 滚动到高亮位置
-        const contentContainer = document.querySelector('.content-container');
+
         const highlightedElement = pre.querySelector('.mark.current');
-        
         if (highlightedElement) {
-          const preRect = pre.getBoundingClientRect();
+          const container = document.querySelector('.content-container');
           const elementRect = highlightedElement.getBoundingClientRect();
-          const containerRect = contentContainer.getBoundingClientRect();
-          
-          // 计算滚动位置：将高亮元素居中显示
-          const scrollTo = (elementRect.top + contentContainer.scrollTop) - 
-                         (containerRect.height / 2) + 
-                         (elementRect.height / 2);
-          
-          contentContainer.scrollTo({
-            top: scrollTo,
-            behavior: 'smooth'
-          });
+          const containerRect = container.getBoundingClientRect();
+
+          const scrollTo = (elementRect.top + container.scrollTop) -
+            (containerRect.height / 2) + (elementRect.height / 2);
+
+          container.scrollTo({ top: scrollTo, behavior: 'smooth' });
         }
-        
         break;
       }
-      
-      totalOffset += textLength;
+
+      totalOffset += text.length;
     }
   }, 100);
 }
 
-// 添加一个用于调试的函数，帮助定位问题
-function debugPosition(section, subsection, start, end) {
-  const details = document.querySelectorAll(`#${section} details`);
-  let totalOffset = 0;
-  
-  for (const detail of details) {
-    const summary = detail.querySelector('summary');
-    if (!summary) continue;
-    
-    const pre = detail.querySelector('pre');
-    if (!pre) continue;
-    
-    const text = pre.textContent;
-    console.log(`Section: ${section}`);
-    console.log(`Subsection: ${summary.textContent}`);
-    console.log(`Text length: ${text.length}`);
-    console.log(`Current total offset: ${totalOffset}`);
-    console.log(`Target start-end: ${start}-${end}`);
-    console.log(`Text preview: ${text.substring(Math.max(0, start - totalOffset - 10), Math.min(text.length, end - totalOffset + 10))}`);
-    console.log('---');
-    
-    totalOffset += text.length;
+// ========== 辅助函数 ==========
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const button = document.querySelector('.collapse-button');
+  if (sidebar.style.width === '0px') {
+    sidebar.style.width = '300px';
+    button.textContent = '收起告警面板 >';
+  } else {
+    sidebar.style.width = '0px';
+    button.textContent = '< 展开告警面板';
   }
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-  fetch('/list_reports')
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('HTTP请求失败');
-      }
-      return response.json();
-    })
-    .then(data => {
-      const select = document.getElementById('reportSelect');
-      // 如果有文件则填充下拉框
-      if (data.files && data.files.length > 0) {
-        data.files.forEach(file => {
-          if (file.endsWith('.txt')) {
-            const option = document.createElement('option');
-            option.value = file;
-            option.textContent = file;
-            select.appendChild(option);
-          }
+function searchTabs() {
+  const input = document.getElementById("searchInput").value.toLowerCase();
+  const tabs = document.getElementsByClassName("tabcontent");
+  let allMatches = [];
+
+  for (let i = 0; i < tabs.length; i++) {
+    const pres = tabs[i].getElementsByTagName("pre");
+    for (let j = 0; j < pres.length; j++) {
+      const preText = pres[j].textContent;
+      const regex = new RegExp(input, 'gi');
+      let match;
+
+      while ((match = regex.exec(preText)) {
+        allMatches.push({
+          tabId: tabs[i].id,
+          preIndex: j,
+          index: match.index,
+          end: match.index + match[0].length,
+          text: match[0]
         });
-      } else {
-        // 如果没有文件，清空下拉框且不提示
-        select.innerHTML = '';
       }
-    })
-    .catch(error => {
-      console.error('获取报告列表失败:', error);
-      // 只有在网络错误或服务器未运行等情况才提示
-      // alert('无法连接到规则引擎服务器，请确保服务正在运行。');
-    });
-});
-
-
-// 点击“本地分析”按钮，发送选定的文件名到 /analyze_file
-function analyzeSelectedFile() {
-  const selectedFile = document.getElementById('reportSelect').value;
-  if (!selectedFile) {
-    alert("请选择一个报告文件");
-    return;
+    }
   }
 
-  // 直接获取并解析原始报告文件
-  fetch(`http://localhost:35000/report/${encodeURIComponent(selectedFile)}`)
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.text();
-    })
-    .then(rawText => {
-      // 解析原始文本报告
-      const parsedData = parseTextReport(rawText);
-
-      // 确保所有子项都有值（避免undefined）
-      const safeData = {};
-      Object.keys(parsedData).forEach(moduleKey => {
-        safeData[moduleKey] = {...parsedData[moduleKey]};
-
-        const subTitles = SUB_TAB_TITLES[moduleKey] || [];
-        subTitles.forEach(subTitle => {
-          if (!(subTitle in safeData[moduleKey])) {
-            safeData[moduleKey][subTitle] = "";
-          }
-        });
-      });
-
-      // 渲染标签页
-      renderTabs(safeData);
-
-      // 同时发送到规则引擎进行分析
-      fetch('http://localhost:35000/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(safeData)
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('分析失败');
-        return res.json();
-      })
-      .then(results => {
-        alertResults = results;
-        displayAlerts();
-      })
-      .catch(error => {
-        console.error('规则分析失败:', error);
-        // 如果分析失败，至少显示基本告警面板
-        displayAlerts();
-      });
-    })
-    .catch(error => {
-      console.error('文件加载失败:', error);
-      alert("文件加载失败：" + error.message);
-    });
+  highlightFirstMatch(allMatches);
 }
 
+function highlightFirstMatch(matches) {
+  if (matches.length === 0) return;
 
-// 显示从接口返回的告警信息
-function displayAlertsFromAPI(results) {
-  const container = document.getElementById('alertContainer');
-  const summary = document.getElementById('alertSummary');
-  container.innerHTML = '';
-  summary.innerHTML = '';
+  const first = matches[0];
+  const tabButton = document.querySelector(`button[onclick="openTab(event, '${first.tabId}')"]`);
+  if (tabButton) tabButton.click();
 
-  // 处理所有级别的告警
-  const allAlerts = [];
-  ['high', 'medium', 'low'].forEach(level => {
-    if (results[level] && results[level].length > 0) {
-      results[level].forEach(alert => {
-        allAlerts.push({...alert, level});
-      });
-    }
-  });
+  setTimeout(() => {
+    const pre = document.getElementById(first.tabId).getElementsByTagName("pre")[first.preIndex];
+    const html = pre.innerHTML.replace(/<span class="mark.*?">(.*?)<\/span>/g, "$1");
 
-  // 如果没有告警
-  if (allAlerts.length === 0) {
-    container.innerHTML = '<div class="alert alert-low">未发现安全告警</div>';
-    return;
-  }
-
-  // 显示统计信息
-  const summaryHtml = `    <div class="alert-badge high">
-      <span>高危告警</span>
-      <span class="count">${results.high ? results.high.length : 0}</span>
-    </div>
-    <div class="alert-badge medium">
-      <span>中危告警</span>
-      <span class="count">${results.medium ? results.medium.length : 0}</span>
-    </div>
-    <div class="alert-badge low">
-      <span>低危告警</span>
-      <span class="count">${results.low ? results.low.length : 0}</span>
-    </div>
-  `;
-  summary.innerHTML = summaryHtml;
-
-  // 显示详细告警信息
-  const alertsHtml = allAlerts.map(alert => {
-    let className = 'alert-low';
-    if (alert.level === 'high') className = 'alert-high';
-    if (alert.level === 'medium') className = 'alert-medium';
-
-    return `      <div class="alert ${className}">
-        <strong>${alert.description || '未知告警'}</strong><br>
-        规则ID: ${alert.rule_id || 'N/A'} |
-        模块: ${alert.section || 'N/A'} |
-        子项: ${alert.subsection || 'N/A'}      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = alertsHtml;
+    const regex = new RegExp(`(${first.text})`, 'gi');
+    pre.innerHTML = html.replace(regex, `<span class="mark current">${first.text}</span>`);
+  }, 100);
 }
-
-function ensureAllSubsections(data) {
-  const result = {...data};
-  Object.keys(TAB_TITLES).forEach(moduleKey => {
-    if (!result[moduleKey]) {
-      result[moduleKey] = {};
-    }
-
-    const subTitles = SUB_TAB_TITLES[moduleKey] || [];
-    subTitles.forEach(subTitle => {
-      if (!result[moduleKey][subTitle]) {
-        result[moduleKey][subTitle] = "";
-      }
-    });
-  });
-  return result;
-}
-function runServerCheck() {
-  const resultDiv = document.getElementById("alertContainer");
-  resultDiv.innerHTML = '<div class="alert alert-low">正在运行服务器检查，请稍候...</div>';
-
-  fetch('/check', {
-    method: 'GET'
-  })
-  .then(response => {
-    if (!response.ok) {
-      return response.json().then(data => {
-        throw new Error(data.error || '未知错误');
-      });
-    }
-    return response.json();
-  })
-  .then(data => {
-    let output = '';
-
-    if (typeof data.stdout === 'string') {
-      try {
-        output = decodeURIComponent(JSON.parse(`"${data.stdout}"`));
-      } catch (e) {
-        output = data.stdout;
-      }
-    }
-
-    resultDiv.innerHTML = `
-      <div class="alert alert-medium">
-        <strong>服务器检查成功！</strong><br>
-        输出信息：<pre>${output}</pre>
-      </div>
-    `;
-
-    // ✅ 检查完成之后刷新报告列表
-    refreshReportList();
-
-  })
-  .catch(error => {
-    resultDiv.innerHTML = `
-      <div class="alert alert-high">
-        <strong>服务器检查失败：</strong><br>
-        ${error.message}
-      </div>
-    `;
-    // 即使失败也尝试刷新列表
-    refreshReportList();
-  });
-}
-
-//刷新列表
-function refreshReportList() {
-  const select = document.getElementById('reportSelect');
-  select.innerHTML = ''; // 清空现有选项
-
-  fetch('/list_reports')
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('HTTP请求失败');
-      }
-      return response.json();
-    })
-    .then(data => {
-      if (data.files && data.files.length > 0) {
-        data.files.forEach(file => {
-          if (file.endsWith('.txt')) {
-            const option = document.createElement('option');
-            option.value = file;
-            option.textContent = file;
-            select.appendChild(option);
-          }
-        });
-      } else {
-        // 可选：添加一个提示项
-        const option = document.createElement('option');
-        option.disabled = true;
-        option.textContent = '暂无可用报告';
-        select.appendChild(option);
-      }
-    })
-    .catch(error => {
-      console.error('获取报告列表失败:', error);
-      // 可选：显示错误或重置下拉框
-      select.innerHTML = '';
-    });
-}
-
-
 </script>
+
 </head>
 <body>
 <div class="header">
