@@ -571,16 +571,18 @@ function escapeHtml(str) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById('reportSelect');
+
   fetch('http://localhost:35000/list_reports')
     .then(response => {
-      if (!response.ok) {
-        throw new Error('HTTP请求失败');
-      }
+      if (!response.ok) throw new Error('HTTP请求失败');
       return response.json();
     })
     .then(data => {
-      const select = document.getElementById('reportSelect');
-      // 如果有文件则填充下拉框
+      console.log('✅ 接收到报告列表:', data);
+
+      select.innerHTML = ''; // 清空旧内容
+
       if (data.files && data.files.length > 0) {
         data.files.forEach(file => {
           if (file.endsWith('.txt')) {
@@ -588,17 +590,14 @@ document.addEventListener("DOMContentLoaded", function () {
             option.value = file;
             option.textContent = file;
             select.appendChild(option);
+            console.log('📌 添加选项:', file);
           }
         });
-      } else {
-        // 如果没有文件，清空下拉框且不提示
-        select.innerHTML = '';
       }
     })
     .catch(error => {
-      console.error('获取报告列表失败:', error);
-      // 只有在网络错误或服务器未运行等情况才提示
-      // alert('无法连接到规则引擎服务器，请确保服务正在运行。');
+      console.error('❌ 获取报告列表失败:', error);
+      select.innerHTML = '';
     });
 });
 
