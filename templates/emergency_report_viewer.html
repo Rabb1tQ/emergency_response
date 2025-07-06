@@ -510,7 +510,7 @@ function highlightCurrentMatch() {
 // 添加规则引擎API调用
 async function analyzeReport(data) {
   try {
-    const response = await fetch('http://localhost:35000/analyze', {
+    const response = await fetch('/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -852,7 +852,7 @@ function analyzeSelectedFile() {
   }
 
   // 直接获取并解析原始报告文件
-  fetch(`http://localhost:35000/report/${encodeURIComponent(selectedFile)}`)
+  fetch(`/report/${encodeURIComponent(selectedFile)}`)
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -880,7 +880,7 @@ function analyzeSelectedFile() {
       renderTabs(safeData);
 
       // 同时发送到规则引擎进行分析
-      fetch('http://localhost:35000/analyze', {
+      fetch('/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
