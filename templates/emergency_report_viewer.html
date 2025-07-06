@@ -573,7 +573,7 @@ function escapeHtml(str) {
 document.addEventListener("DOMContentLoaded", function () {
   const select = document.getElementById('reportSelect');
 
-  fetch('http://localhost:35000/list_reports')
+  fetch('/list_reports')
     .then(response => {
       if (!response.ok) throw new Error('HTTP请求失败');
       return response.json();
@@ -843,7 +843,7 @@ function debugPosition(section, subsection, start, end) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  fetch('http://localhost:35000/list_reports')
+  fetch('/list_reports')
     .then(response => {
       if (!response.ok) {
         throw new Error('HTTP请求失败');
@@ -1066,7 +1066,7 @@ function refreshReportList() {
   const select = document.getElementById('reportSelect');
   select.innerHTML = ''; // 清空现有选项
 
-  fetch('http://localhost:35000/list_reports')
+  fetch('/list_reports')
     .then(response => {
       if (!response.ok) {
         throw new Error('HTTP请求失败');
