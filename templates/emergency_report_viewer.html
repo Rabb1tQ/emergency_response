@@ -2,7 +2,8 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>Linux 应急响应报告查看器</title>
+<title>服务器应急检测工具</title>
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 <style>
 body { 
   font-family: "Microsoft YaHei", Arial, sans-serif; 
@@ -184,6 +185,8 @@ body {
   overflow-x: auto;
   margin: 0;
   font-size: 14px;
+  white-space: pre-wrap; /* 允许自动换行 */
+  word-wrap: break-word; /* 在长单词或URL地址内部进行换行 */
 }
 
 .tabcontent details {
@@ -265,7 +268,17 @@ body {
   50% { background: #ff8888; }
   100% { background: #ff4444; }
 }
+.alert-check {
+  background: #fff9c4;
+  color: #827717;
+  border-left: 5px solid #d4af37;
+}
 
+.alert-check pre {
+  background: #fffde7;
+  padding: 10px;
+  font-size: 14px;
+}
 </style>
 <script>
 const TAB_TITLES = {
@@ -312,20 +325,20 @@ function parseTextReport(text) {
   const sections = text.split("##########################################");
   const data = {};
   let currentSection = null;
-  
+
   for (const section of sections) {
     if (!section.trim()) continue;
-    
+
     const moduleMatch = section.match(/模块: (.*?)\n/);
     if (!moduleMatch) continue;
-    
+
     const moduleTitle = moduleMatch[1];
     const moduleKey = Object.keys(TAB_TITLES).find(key => TAB_TITLES[key] === moduleTitle);
     if (!moduleKey) continue;
-    
+
     const subSections = section.split("------------------------------------------");
     data[moduleKey] = {};
-    
+
     for (let i = 1; i < subSections.length; i += 2) {
       const titleMatch = subSections[i].match(/子项: (.*?)\n/);
       if (!titleMatch) continue;
@@ -334,7 +347,7 @@ function parseTextReport(text) {
       data[moduleKey][title] = content;
     }
   }
-  
+
   return data;
 }
 
@@ -376,7 +389,7 @@ function searchTabs() {
 
   searchResults = [];
   currentSearchIndex = -1;
-  
+
   const tabs = document.getElementsByClassName("tabcontent");
   for (let i = 0; i < tabs.length; i++) {
     const tabId = tabs[i].id;
@@ -393,7 +406,7 @@ function searchTabs() {
       });
     }
   }
-  
+
   highlightCurrentMatch();
   updateSearchCount(searchResults.length, currentSearchIndex);
 }
@@ -413,11 +426,11 @@ function updateSearchCount(total, current) {
 
 function navigateSearch(direction) {
   if (searchResults.length === 0) return;
-  
+
   currentSearchIndex += direction;
   if (currentSearchIndex < 0) currentSearchIndex = searchResults.length - 1;
   if (currentSearchIndex >= searchResults.length) currentSearchIndex = 0;
-  
+
   highlightCurrentMatch();
   updateSearchCount(searchResults.length, currentSearchIndex);
 }
@@ -432,28 +445,28 @@ function highlightCurrentMatch() {
       pres[j].innerHTML = html;
     }
   }
-  
+
   if (searchResults.length === 0 || currentSearchIndex === -1) return;
-  
+
   const currentMatch = searchResults[currentSearchIndex];
-  
+
   // 切换到对应的标签页
   const tabButton = document.querySelector(`button[onclick="openTab(event, '${currentMatch.tabId}')"]`);
   if (tabButton) {
     tabButton.click();
   }
-  
+
   // 高亮所有匹配项，当前匹配项特殊高亮
   const searchTerm = document.getElementById("searchInput").value;
   const regex = new RegExp(`(${searchTerm})`, 'gi');
   const targetPre = document.getElementById(currentMatch.tabId)
     .getElementsByTagName("pre")[currentMatch.preIndex];
-  
+
   targetPre.innerHTML = targetPre.textContent.replace(regex, (match, p1, offset) => {
     const isCurrentMatch = offset === currentMatch.index;
     return `<span class="mark${isCurrentMatch ? ' current' : ''}">${match}</span>`;
   });
-  
+
   // 找到当前匹配项的元素
   const currentElement = targetPre.querySelector('.mark.current');
   if (currentElement) {
@@ -462,31 +475,31 @@ function highlightCurrentMatch() {
     if (detailsElement && !detailsElement.open) {
       detailsElement.open = true;
     }
-    
+
     // 计算滚动位置
     const contentContainer = document.querySelector('.content-container');
     const elementRect = currentElement.getBoundingClientRect();
     const containerRect = contentContainer.getBoundingClientRect();
-    
+
     // 检查元素是否在视图中
     const isInView = (
       elementRect.top >= containerRect.top &&
       elementRect.bottom <= containerRect.bottom
     );
-    
+
     if (!isInView) {
       // 计算理想的滚动位置（将匹配项放在容器中间）
       const elementTop = elementRect.top + contentContainer.scrollTop - containerRect.top;
       const containerMiddle = containerRect.height / 2;
       const scrollTo = elementTop - containerMiddle + elementRect.height / 2;
-      
+
       // 平滑滚动到目标位置
       contentContainer.scrollTo({
         top: scrollTo,
         behavior: 'smooth'
       });
     }
-    
+
     // 添加闪烁动画以突出显示当前匹配项
     currentElement.style.animation = 'none';
     currentElement.offsetHeight; // 触发重绘
@@ -497,18 +510,18 @@ function highlightCurrentMatch() {
 // 添加规则引擎API调用
 async function analyzeReport(data) {
   try {
-    const response = await fetch('http://localhost:5000/analyze', {
+    const response = await fetch('/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(data)
     });
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const results = await response.json();
     alertResults = results;
     displayAlerts();
@@ -530,7 +543,7 @@ async function analyzeReport(data) {
 
 // 修改renderTabs函数
 function renderTabs(data) {
-  const tabBtnHtml = gTabs.map((k, i) => 
+  const tabBtnHtml = gTabs.map((k, i) =>
     `<button class="tablinks" onclick="openTab(event, '${k}')">${TAB_TITLES[k]}</button>`
   ).join("");
   document.getElementById("tabBtns").innerHTML = tabBtnHtml;
@@ -548,7 +561,7 @@ function renderTabs(data) {
   if (gTabs.length) {
     setTimeout(() => document.getElementsByClassName("tablinks")[0].click(), 100);
   }
-  
+
   // 调用规则引擎API进行分析
   analyzeReport(data);
 }
@@ -558,32 +571,37 @@ function escapeHtml(str) {
   return str.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-  document.getElementById("fileInput").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const text = e.target.result;
-        try {
-          const data = JSON.parse(text);
-          renderTabs(data);
-        } catch (jsonError) {
-          const data = parseTextReport(text);
-          renderTabs(data);
-        }
-      } catch (err) {
-        alert("解析失败：" + err.message);
+document.addEventListener("DOMContentLoaded", function () {
+  const select = document.getElementById('reportSelect');
+
+  fetch('/list_reports')
+    .then(response => {
+      if (!response.ok) throw new Error('HTTP请求失败');
+      return response.json();
+    })
+    .then(data => {
+      console.log('✅ 接收到报告列表:', data);
+
+      select.innerHTML = ''; // 清空旧内容
+
+      if (data.files && data.files.length > 0) {
+        data.files.forEach(file => {
+          if (file.endsWith('.txt')) {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file;
+            select.appendChild(option);
+            console.log('📌 添加选项:', file);
+          }
+        });
       }
-    };
-    reader.readAsText(file);
-  });
-  
-  // 添加搜索导航事件监听
-  document.getElementById("prevMatch").addEventListener("click", () => navigateSearch(-1));
-  document.getElementById("nextMatch").addEventListener("click", () => navigateSearch(1));
+    })
+    .catch(error => {
+      console.error('❌ 获取报告列表失败:', error);
+      select.innerHTML = '';
+    });
 });
+
 
 // 添加侧边栏折叠功能
 function toggleSidebar() {
@@ -602,11 +620,11 @@ function toggleSidebar() {
 function displayAlerts() {
   const container = document.getElementById('alertContainer');
   const summary = document.getElementById('alertSummary');
-  
+
   // 清空现有内容
   container.innerHTML = '';
   summary.innerHTML = '';
-  
+
   // 显示告警统计
   const summaryHtml = `
     <div class="alert-badge high">
@@ -623,7 +641,7 @@ function displayAlerts() {
     </div>
   `;
   summary.innerHTML = summaryHtml;
-  
+
   // 显示告警详情
   const alertsHtml = [
     ...alertResults.high.map(alert => `
@@ -693,7 +711,7 @@ function displayAlerts() {
       </div>
     `)
   ].join('');
-  
+
   container.innerHTML = alertsHtml;
 }
 
@@ -704,7 +722,7 @@ function analyzeCurrentData() {
     alert('请先上传文件');
     return;
   }
-  
+
   const file = fileInput.files[0];
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -739,62 +757,62 @@ function scrollToPosition(section, subsection, start, end) {
   setTimeout(() => {
     const details = document.querySelectorAll(`#${section} details`);
     let totalOffset = 0; // 用于跟踪在所有pre标签中的累积偏移量
-    
+
     for (const detail of details) {
       const summary = detail.querySelector('summary');
       if (!summary) continue;
-      
+
       const pre = detail.querySelector('pre');
       if (!pre) continue;
-      
+
       const text = pre.textContent;
       const textLength = text.length;
-      
+
       // 检查目标位置是否在当前pre标签的范围内
       if (start >= totalOffset && start < totalOffset + textLength) {
         detail.open = true;
-        
+
         // 计算相对于当前pre的位置
         const relativeStart = start - totalOffset;
         const relativeEnd = Math.min(end - totalOffset, textLength);
-        
+
         // 获取目标文本
         const targetText = text.substring(relativeStart, relativeEnd);
-        
+
         // 清除所有现有高亮
         pre.innerHTML = escapeHtml(text);
-        
+
         // 重新计算位置并高亮
         const beforeText = text.substring(0, relativeStart);
         const afterText = text.substring(relativeEnd);
-        
+
         pre.innerHTML = escapeHtml(beforeText) +
           `<span class="mark current" style="animation: highlight-pulse 1s;">${escapeHtml(targetText)}</span>` +
           escapeHtml(afterText);
-        
+
         // 滚动到高亮位置
         const contentContainer = document.querySelector('.content-container');
         const highlightedElement = pre.querySelector('.mark.current');
-        
+
         if (highlightedElement) {
           const preRect = pre.getBoundingClientRect();
           const elementRect = highlightedElement.getBoundingClientRect();
           const containerRect = contentContainer.getBoundingClientRect();
-          
+
           // 计算滚动位置：将高亮元素居中显示
-          const scrollTo = (elementRect.top + contentContainer.scrollTop) - 
-                         (containerRect.height / 2) + 
+          const scrollTo = (elementRect.top + contentContainer.scrollTop) -
+                         (containerRect.height / 2) +
                          (elementRect.height / 2);
-          
+
           contentContainer.scrollTo({
             top: scrollTo,
             behavior: 'smooth'
           });
         }
-        
+
         break;
       }
-      
+
       totalOffset += textLength;
     }
   }, 100);
@@ -804,14 +822,14 @@ function scrollToPosition(section, subsection, start, end) {
 function debugPosition(section, subsection, start, end) {
   const details = document.querySelectorAll(`#${section} details`);
   let totalOffset = 0;
-  
+
   for (const detail of details) {
     const summary = detail.querySelector('summary');
     if (!summary) continue;
-    
+
     const pre = detail.querySelector('pre');
     if (!pre) continue;
-    
+
     const text = pre.textContent;
     console.log(`Section: ${section}`);
     console.log(`Subsection: ${summary.textContent}`);
@@ -820,18 +838,249 @@ function debugPosition(section, subsection, start, end) {
     console.log(`Target start-end: ${start}-${end}`);
     console.log(`Text preview: ${text.substring(Math.max(0, start - totalOffset - 10), Math.min(text.length, end - totalOffset + 10))}`);
     console.log('---');
-    
+
     totalOffset += text.length;
   }
 }
+
+// 点击“本地分析”按钮，发送选定的文件名到 /analyze_file
+function analyzeSelectedFile() {
+  const selectedFile = document.getElementById('reportSelect').value;
+  if (!selectedFile) {
+    alert("请选择一个报告文件");
+    return;
+  }
+
+  // 直接获取并解析原始报告文件
+  fetch(`/report/${encodeURIComponent(selectedFile)}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.text();
+    })
+    .then(rawText => {
+      // 解析原始文本报告
+      const parsedData = parseTextReport(rawText);
+
+      // 确保所有子项都有值（避免undefined）
+      const safeData = {};
+      Object.keys(parsedData).forEach(moduleKey => {
+        safeData[moduleKey] = {...parsedData[moduleKey]};
+
+        const subTitles = SUB_TAB_TITLES[moduleKey] || [];
+        subTitles.forEach(subTitle => {
+          if (!(subTitle in safeData[moduleKey])) {
+            safeData[moduleKey][subTitle] = "";
+          }
+        });
+      });
+
+      // 渲染标签页
+      renderTabs(safeData);
+
+      // 同时发送到规则引擎进行分析
+      fetch('/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(safeData)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('分析失败');
+        return res.json();
+      })
+      .then(results => {
+        alertResults = results;
+        displayAlerts();
+      })
+      .catch(error => {
+        console.error('规则分析失败:', error);
+        // 如果分析失败，至少显示基本告警面板
+        displayAlerts();
+      });
+    })
+    .catch(error => {
+      console.error('文件加载失败:', error);
+      alert("文件加载失败：" + error.message);
+    });
+}
+
+
+// 显示从接口返回的告警信息
+function displayAlertsFromAPI(results) {
+  const container = document.getElementById('alertContainer');
+  const summary = document.getElementById('alertSummary');
+  container.innerHTML = '';
+  summary.innerHTML = '';
+
+  // 处理所有级别的告警
+  const allAlerts = [];
+  ['high', 'medium', 'low'].forEach(level => {
+    if (results[level] && results[level].length > 0) {
+      results[level].forEach(alert => {
+        allAlerts.push({...alert, level});
+      });
+    }
+  });
+
+  // 如果没有告警
+  if (allAlerts.length === 0) {
+    container.innerHTML = '<div class="alert alert-low">未发现安全告警</div>';
+    return;
+  }
+
+  // 显示统计信息
+  const summaryHtml = `    <div class="alert-badge high">
+      <span>高危告警</span>
+      <span class="count">${results.high ? results.high.length : 0}</span>
+    </div>
+    <div class="alert-badge medium">
+      <span>中危告警</span>
+      <span class="count">${results.medium ? results.medium.length : 0}</span>
+    </div>
+    <div class="alert-badge low">
+      <span>低危告警</span>
+      <span class="count">${results.low ? results.low.length : 0}</span>
+    </div>
+  `;
+  summary.innerHTML = summaryHtml;
+
+  // 显示详细告警信息
+  const alertsHtml = allAlerts.map(alert => {
+    let className = 'alert-low';
+    if (alert.level === 'high') className = 'alert-high';
+    if (alert.level === 'medium') className = 'alert-medium';
+
+    return `      <div class="alert ${className}">
+        <strong>${alert.description || '未知告警'}</strong><br>
+        规则ID: ${alert.rule_id || 'N/A'} |
+        模块: ${alert.section || 'N/A'} |
+        子项: ${alert.subsection || 'N/A'}      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = alertsHtml;
+}
+
+function ensureAllSubsections(data) {
+  const result = {...data};
+  Object.keys(TAB_TITLES).forEach(moduleKey => {
+    if (!result[moduleKey]) {
+      result[moduleKey] = {};
+    }
+
+    const subTitles = SUB_TAB_TITLES[moduleKey] || [];
+    subTitles.forEach(subTitle => {
+      if (!result[moduleKey][subTitle]) {
+        result[moduleKey][subTitle] = "";
+      }
+    });
+  });
+  return result;
+}
+function runServerCheck() {
+  const resultDiv = document.getElementById("alertContainer");
+  resultDiv.innerHTML = '<div class="alert alert-low">正在运行服务器检查，请稍候...</div>';
+
+  fetch('/check', {
+    method: 'GET'
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(data => {
+        throw new Error(data.error || '未知错误');
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    let output = '';
+
+    if (typeof data.stdout === 'string') {
+      try {
+        output = decodeURIComponent(JSON.parse(`"${data.stdout}"`));
+      } catch (e) {
+        output = data.stdout;
+      }
+    }
+
+    resultDiv.innerHTML = `
+      <div class="alert alert-medium">
+        <strong>服务器检查成功！</strong><br>
+        输出信息：<pre>${output}</pre>
+      </div>
+    `;
+
+    // ✅ 检查完成之后刷新报告列表
+    refreshReportList();
+
+  })
+  .catch(error => {
+    resultDiv.innerHTML = `
+      <div class="alert alert-high">
+        <strong>服务器检查失败：</strong><br>
+        ${error.message}
+      </div>
+    `;
+    // 即使失败也尝试刷新列表
+    refreshReportList();
+  });
+}
+
+//刷新列表
+function refreshReportList() {
+  const select = document.getElementById('reportSelect');
+  select.innerHTML = ''; // 清空现有选项
+
+  fetch('/list_reports')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('HTTP请求失败');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.files && data.files.length > 0) {
+        data.files.forEach(file => {
+          if (file.endsWith('.txt')) {
+            const option = document.createElement('option');
+            option.value = file;
+            option.textContent = file;
+            select.appendChild(option);
+          }
+        });
+      } else {
+        // 可选：添加一个提示项
+        const option = document.createElement('option');
+        option.disabled = true;
+        option.textContent = '暂无可用报告';
+        select.appendChild(option);
+      }
+    })
+    .catch(error => {
+      console.error('获取报告列表失败:', error);
+      // 可选：显示错误或重置下拉框
+      select.innerHTML = '';
+    });
+}
+
+
 </script>
 </head>
 <body>
 <div class="header">
-  <h1>Linux 应急响应报告查看器</h1>
+  <h1>服务器应急检测工具</h1>
   <div style="display: flex; gap: 10px; align-items: center;">
     <input type="file" id="fileInput" accept=".txt,.json">
     <button onclick="analyzeCurrentData()" style="padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer;">分析报告</button>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <label for="reportSelect">选择报告:</label>
+    <select id="reportSelect" style="padding: 8px;"></select>
+    <button onclick="analyzeSelectedFile()" style="padding: 8px 15px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">本地分析</button>
+    <button id="runCheckButton" onclick="runServerCheck()" style="padding: 8px 15px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">运行服务器检查</button>
   </div>
   <div class="search-container">
     <input type="text" id="searchInput" onkeyup="searchTabs()" placeholder="输入关键词高亮...">
